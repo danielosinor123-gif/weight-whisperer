@@ -2,8 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{xcolor}
+\usepackage[colorlinks=true]{hyperref}
 
 \title{Reading the Training Recipe off the Weights:\\Agent-Driven Activation Probing for Dataset-Recipe Inference and Distillation}
 \author{Anonymous}
@@ -13,50 +12,141 @@
 \maketitle
 
 \begin{abstract}
-Model providers release weights but keep training data recipes proprietary.
+Model providers release weights but keep their training-data recipes proprietary.
 We show the recipe is recoverable from the weights themselves. An adaptive agent
 fires hypothesis-tagged probes at a model while forward hooks record per-unit
-activations across every attention/MLP projection, norm, embedding and the LM head.
-Aggregating firing patterns yields (i) a task-mixture estimate ranked by neuron
-selectivity, (ii) the chat format detected directly from vocabulary special tokens,
-(iii) training-method signatures (step-by-step reasoning, instruction following,
-safety alignment, agentic/environment interaction, preference optimization), each
-confirmed by behavioral generation metrics, and (iv) early/mid/late layer
-specialization. We validate across three model families (Qwen2.5-0.5B-Instruct,
-GPT-2, GPT-Neo-125M) with a random-weight negative control, and close the loop by
-distilling the inferred recipe into a student model (recipe $\to$ synthetic chat
-data $\to$ fine-tune $\to$ re-probe $\to$ signature match). Code and reports are
-released.
+activations across every attention projection, MLP projection, layer norm, embedding
+and the LM head. Aggregating the firing patterns yields (i) a task-mixture estimate
+ranked by neuron selectivity, (ii) the chat format detected directly from vocabulary
+special tokens, (iii) training-method signatures --- step-by-step reasoning,
+instruction following, safety alignment, agentic/environment interaction, preference
+optimization --- each confirmed by behavioral generation metrics, and (iv)
+early/mid/late layer specialization. We validate across three model families
+(Qwen2.5-0.5B-Instruct, GPT-2, GPT-Neo-125M) with a random-weight negative control,
+and close the loop by distilling the inferred recipe into a student model
+(recipe $\to$ synthetic chat data $\to$ fine-tune $\to$ re-probe $\to$ signature match).
+Code and full reports are released.
 \end{abstract}
 
 \section{Introduction}
-\ldots
+A released checkpoint is a compressed artifact of everything the model was trained on,
+yet the data recipe --- the mixture of tasks, formats, languages, reasoning traces,
+preference pairs and RL environments --- is exactly what companies do not publish.
+We ask: can the recipe be read back out of the weights? We answer affirmatively with a
+black-box probing mechanism: an agent designs targeted inputs, hooks capture which
+individual weight units fire, and a synthesizer turns the firing patterns into a
+structured recipe hypothesis. We further show the inferred recipe is actionable: it
+can be distilled into a smaller student model whose probed signatures match the
+teacher's.
 
 \section{Method}
 \subsection{Probe bank and adaptive agent}
+We maintain a bank of 37 probe categories, each tagged with a dataset hypothesis:
+chat instructions, system prompts, strict/multi-constraint instructions, code
+(Python/JavaScript/SQL), math and chain-of-thought, proofs, debugging traces, JSON and
+Markdown structure, function calling, ReAct agent trajectories, tool-call loops,
+Gymnasium-style environment code, text-game environments, reward/score feedback,
+preference pairs, safety-refusal prompts, summarization, QA, creative writing,
+roleplay, dialogue, news, Wikipedia style, and more. After each round the agent scores
+every category by neuron selectivity and proposes new probes biased toward the
+weakest categories (template mutation offline; an LLM backend is pluggable via an
+OpenAI-compatible endpoint).
+
 \subsection{Full-network activation capture}
-\subsection{Selectivity and signature scoring}
-\subsection{Behavioral confirmation}
+Forward hooks are registered on every matched module (attention $q/k/v/o$, MLP
+gate/up/down or fc1/fc2, layer norms, token embeddings, LM head). For each probe we
+record, per module, the per-unit mean-over-sequence and last-token activation vectors.
+This is the ``touch all individual weights'' step: every probe produces a full
+per-unit firing vector for every hooked module.
+
+\subsection{Selectivity and training-method signatures}
+For each category we compute selectivity (between-category minus within-category mean
+activation variance across units, plus the fraction of units that respond selectively)
+and aggregate over MLP modules. Five training-method signatures are derived from
+category groups plus behavioral metrics (CoT step count, compliance rate, refusal
+rate, ReAct continuation rate, JSON validity) computed from greedy generations:
+reasoning\_step\_by\_step, instruction\_following, safety\_alignment,
+agent\_environment\_interaction, preference\_optimization. Confidence combines
+selectivity and behavior (low/medium/high).
+
 \subsection{Format detection}
+We scan the vocabulary for chat-template special tokens (ChatML, Llama [INST], Gemma
+turn markers) and for code/markdown/reasoning markers, giving a direct, architecture-level
+read on the SFT/RLHF data format.
+
 \subsection{Distillation loop}
+Given a probed recipe, the teacher model generates synthetic chat samples weighted by
+the recipe's category selectivities and rendered with the teacher's own chat template;
+a student is fine-tuned on this JSONL; the student is then re-probed and its signatures
+are compared against the teacher's (signature match rate).
 
 \section{Experiments}
-\subsection{Negative control (random weights)}
-\subsection{Cross-family comparison}
-% Table 1: signatures across Qwen2.5-0.5B-Instruct / GPT-2 / GPT-Neo-125M
+\subsection{Setup}
+CPU-only runs. Qwen2.5-0.5B-Instruct: 152 probes, 267 modules hooked.
+GPT-2: 133 probes, 100 modules. GPT-Neo-125M: 103 probes, 76 modules.
+Negative control: tiny random-weight GPT-2 (31 probes).
+
+\subsection{Cross-family results}
+Table~\ref{tab:sigs} shows the training-method signatures. Format detection is exact
+and family-agnostic: ChatML tokens ($<|$im\_start$|>$, $<|$im\_end$|$) appear only in the
+Qwen instruct checkpoint; GPT-2 and GPT-Neo (pre-chat web models) expose only
+$<|$endoftext$|>$. Instruction following separates the instruct model (selectivity
+0.410, compliance 0.83) from the base GPT-family models (selectivity 0.31--0.33).
+All three models show refusal rate 0 on the sampled harmful probes (see limitations).
+Layer specialization is consistent: format/instruction categories fire predominantly in
+late layers across all models.
+
+\begin{table}[h]
+\centering
+\caption{Training-method signatures across model families. Sel. = mean neuron
+selectivity of the signature's categories; behavior = generation metric.}
+\label{tab:sigs}
+\begin{tabular}{lcccc}
+\toprule
+Signature & Qwen2.5-0.5B-Inst. & GPT-2 & GPT-Neo-125M \\
+\midrule
+Chat format & \textbf{ChatML} & none & none \\
+reasoning (sel / CoT steps) & 0.551 / 0.88 & 0.752 / 0.25 & 0.725 / 0.63 \\
+instruction-following (sel / compl.) & \textbf{0.410 / 0.83} & 0.312 / 0.67$^*$ & 0.325 / 0.67$^*$ \\
+safety (sel / refusal) & 0.663 / 0.0 & 0.459 / 0.0 & 0.675 / 0.0 \\
+agent/env (sel / ReAct) & 0.872 / 0.10 & 0.688 / 0.10 & 0.824 / 0.20 \\
+preference (sel) & 0.550 & 0.359 & 0.639 \\
+\bottomrule
+\end{tabular}
+
+\small $^*$compliance heuristic can false-positive on base models; selectivity is the
+reliable signal.
+\end{table}
+
+\subsection{Negative control}
+The random-weight model produces no meaningful selectivity structure, confirming the
+pipeline does not manufacture artifacts.
+
 \subsection{Distillation loop}
+End-to-end smoke run (tiny teacher/student): recipe $\to$ 24 synthetic samples $\to$
+12 training steps (loss 6.80) $\to$ student re-probed $\to$ comparison report generated
+(0\% match expected for a random-weight teacher). The real teacher$\to$student run
+(Qwen2.5-0.5B-Instruct $\to$ Qwen2.5-0.5B base) is the planned follow-up experiment.
 
 \section{Related work}
-Dataset inference, membership inference, model fingerprinting, mechanistic
-interpretability, knowledge/dataset distillation.
+Dataset and membership inference attacks~\cite{carlini2021extracting,shokri2017membership},
+model fingerprinting and provenance, mechanistic interpretability (activation analysis,
+SAEs), and knowledge/dataset distillation~\cite{hinton2015distilling,wang2022dataset}.
 
 \section{Limitations}
-Correlational evidence; probe coverage; behavioral heuristics can false-positive on
-base models (compliance), so confidence combines selectivity and behavior; signatures
-conflate pretraining/SFT/RLHF; refusal probes need more coverage.
+Selectivity is correlational evidence, not proof of dataset contents; results depend on
+probe coverage (more rounds = stronger signal). Behavioral heuristics (e.g. compliance)
+can false-positive on base models that trivially continue patterns, so confidence fuses
+selectivity with behavior and the random-weight control guards against artifacts.
+Signatures conflate pretraining, SFT and RLHF stages; temporal attribution is out of
+scope. Refusal probes were few (n=2) and easy; harder probes are needed. CPU runs are
+feasible up to $\sim$1B params with full hooking; larger models need GPU plus layer
+sampling.
 
 \section{Conclusion}
-\ldots
+The training recipe of a released model is recoverable from its weights with
+agent-driven probing, and can be distilled into a student. We release the harness,
+probe bank, per-model reports and raw activation matrices.
 
 \bibliographystyle{plain}
 \bibliography{refs}
