@@ -1,0 +1,6 @@
+torch>=2.0
+transformers>=4.40
+numpy>=1.24
+# optional: clustering / analysis of activations.npz
+scikit-learn>=1.3
+scipy>=1.10

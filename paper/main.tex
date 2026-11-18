@@ -1,0 +1,63 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\title{Reading the Training Recipe off the Weights:\\Agent-Driven Activation Probing for Dataset-Recipe Inference and Distillation}
+\author{Anonymous}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Model providers release weights but keep training data recipes proprietary.
+We show the recipe is recoverable from the weights themselves. An adaptive agent
+fires hypothesis-tagged probes at a model while forward hooks record per-unit
+activations across every attention/MLP projection, norm, embedding and the LM head.
+Aggregating firing patterns yields (i) a task-mixture estimate ranked by neuron
+selectivity, (ii) the chat format detected directly from vocabulary special tokens,
+(iii) training-method signatures (step-by-step reasoning, instruction following,
+safety alignment, agentic/environment interaction, preference optimization), each
+confirmed by behavioral generation metrics, and (iv) early/mid/late layer
+specialization. We validate across three model families (Qwen2.5-0.5B-Instruct,
+GPT-2, GPT-Neo-125M) with a random-weight negative control, and close the loop by
+distilling the inferred recipe into a student model (recipe $\to$ synthetic chat
+data $\to$ fine-tune $\to$ re-probe $\to$ signature match). Code and reports are
+released.
+\end{abstract}
+
+\section{Introduction}
+\ldots
+
+\section{Method}
+\subsection{Probe bank and adaptive agent}
+\subsection{Full-network activation capture}
+\subsection{Selectivity and signature scoring}
+\subsection{Behavioral confirmation}
+\subsection{Format detection}
+\subsection{Distillation loop}
+
+\section{Experiments}
+\subsection{Negative control (random weights)}
+\subsection{Cross-family comparison}
+% Table 1: signatures across Qwen2.5-0.5B-Instruct / GPT-2 / GPT-Neo-125M
+\subsection{Distillation loop}
+
+\section{Related work}
+Dataset inference, membership inference, model fingerprinting, mechanistic
+interpretability, knowledge/dataset distillation.
+
+\section{Limitations}
+Correlational evidence; probe coverage; behavioral heuristics can false-positive on
+base models (compliance), so confidence combines selectivity and behavior; signatures
+conflate pretraining/SFT/RLHF; refusal probes need more coverage.
+
+\section{Conclusion}
+\ldots
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
