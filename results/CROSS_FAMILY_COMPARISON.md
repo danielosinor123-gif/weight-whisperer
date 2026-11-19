@@ -27,10 +27,12 @@ Same harness, same 37-category probe bank + adaptive agent, three model families
 5. **Negative control** (tiny-random-gpt2, out_smoke): no meaningful structure — pipeline
    is not producing artifacts.
 
-## Distillation loop (distill_smoke)
-gen (24 synthetic samples from recipe) -> train (12 steps, loss 6.80) -> verify
-(signature comparison report generated). 0% match expected: random-weight teacher has
-no signatures to transfer. Real teacher->student run queued as follow-up (E4).
+## Distillation loop — accuracy test of the probe (distill_qwen)
+Teacher Qwen2.5-0.5B-Instruct probed -> recipe -> 125 synthetic ChatML samples
+(selectivity-weighted) -> base Qwen2.5-0.5B student fine-tuned (24 steps) -> student
+re-probed -> **signature match rate 60%** (3/5 exact confidence match; same-direction
+selectivity on 4/5). Negative control (random teacher, distill_smoke): 0%.
+See `distill_qwen/distillation_report.md`.
 
 ## Files
 - `out_qwen05b_v2/recipe_report.md`, `out_gpt2/recipe_report.md`, `out_gptneo125m/recipe_report.md`

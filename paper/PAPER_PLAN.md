@@ -61,8 +61,9 @@ optimization) each with behavioral confirmation, and (d) layer specialization.
 - results/ (recipe_report.md, distillation_report.md — redacted raw npz optional)
 
 ## TODO before push
-- [ ] v2 probe run results (out_qwen05b_v2)
-- [ ] distillation run results (distill_qwen)
-- [ ] requirements.txt, LICENSE (MIT), README polish
-- [ ] git init + remote + push
-- [ ] paper LaTeX draft -> arXiv
+- [x] v2 probe run results (out_qwen05b_v2)
+- [x] distillation run results (distill_qwen): 60% signature match rate
+- [x] requirements.txt, LICENSE (MIT), README polish
+- [x] git init + remote + push (danielosinor123-gif/dataset-recipe-inferrer)
+- [x] paper LaTeX draft (paper/main.tex)
+- [ ] compile main.tex, submit to arXiv

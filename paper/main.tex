@@ -122,11 +122,34 @@ reliable signal.
 The random-weight model produces no meaningful selectivity structure, confirming the
 pipeline does not manufacture artifacts.
 
-\subsection{Distillation loop}
-End-to-end smoke run (tiny teacher/student): recipe $\to$ 24 synthetic samples $\to$
-12 training steps (loss 6.80) $\to$ student re-probed $\to$ comparison report generated
-(0\% match expected for a random-weight teacher). The real teacher$\to$student run
-(Qwen2.5-0.5B-Instruct $\to$ Qwen2.5-0.5B base) is the planned follow-up experiment.
+\subsection{Distillation loop (accuracy test of the probe)}
+Teacher Qwen2.5-0.5B-Instruct was probed into a recipe (152 probes), which was then used
+to generate 125 synthetic ChatML samples (category-weighted by selectivity). A base
+Qwen2.5-0.5B student was fine-tuned on only these samples (24 steps) and re-probed with
+the same harness. Result: \textbf{60\% exact signature-confidence match} (3/5:
+preference\_optimization, reasoning\_step\_by\_step, safety\_alignment), with
+same-direction selectivity on 4/5 signatures (Table~\ref{tab:distill}); the student even
+exceeds teacher selectivity on instruction\_following (0.583 vs 0.410) and
+agent\_environment\_interaction (1.313 vs 0.872), consistent with a small focused
+synthetic set. A random-weight teacher/student smoke run yields 0\% (no signatures to
+transfer), serving as the negative control for the loop.
+
+\begin{table}[h]
+\centering
+\caption{Distillation: teacher (probed) vs student (trained on recipe-only synthetic data).}
+\label{tab:distill}
+\begin{tabular}{lcccc}
+\toprule
+Signature & teacher conf & student conf & teacher sel. & student sel. \\
+\midrule
+agent\_environment\_interaction & low & high & 0.872 & 1.313 \\
+instruction\_following & high & medium & 0.410 & 0.583 \\
+preference\_optimization & low & low & 0.550 & 0.735 \\
+reasoning\_step\_by\_step & low & low & 0.551 & 0.851 \\
+safety\_alignment & low & low & 0.663 & 0.379 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Related work}
 Dataset and membership inference attacks~\cite{carlini2021extracting,shokri2017membership},

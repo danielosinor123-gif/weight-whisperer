@@ -39,7 +39,8 @@ from .synthesizer import synthesize
 # ---------------------------------------------------------------------------
 
 def gen_synthetic_data(teacher, tokenizer, recipe: dict, n_samples: int,
-                       device: str, max_new_tokens: int = 96, seed: int = 0) -> list[dict]:
+                       device: str, max_new_tokens: int = 96, seed: int = 0,
+                       stream_path: Path | None = None) -> list[dict]:
     rng = random.Random(seed)
     mixture = recipe.get("task_mixture_evidence", {})
     # weight categories by selectivity; always include signature categories
@@ -52,6 +53,7 @@ def gen_synthetic_data(teacher, tokenizer, recipe: dict, n_samples: int,
         by_cat.setdefault(p["category"], []).append(p["text"])
 
     samples = []
+    stream = stream_path.open("w", encoding="utf-8") if stream_path else None
     teacher.eval()
     for i in range(n_samples):
         cat = rng.choices(cats, weights=weights, k=1)[0]
@@ -65,10 +67,19 @@ def gen_synthetic_data(teacher, tokenizer, recipe: dict, n_samples: int,
         completion = tokenizer.decode(out[0, ids["input_ids"].shape[1]:], skip_special_tokens=True)
         if len(completion.strip()) < 8:
             continue
-        samples.append({"category": cat, "messages": [
+        s = {"category": cat, "messages": [
             {"role": "user", "content": prompt},
             {"role": "assistant", "content": completion.strip()},
-        ]})
+        ]}
+        samples.append(s)
+        if stream:  # incremental write so restarts don't lose progress
+            stream.write(json.dumps({"text": render_chat(tokenizer, s["messages"]),
+                                     "category": cat}) + "\n")
+            stream.flush()
+        if (i + 1) % 25 == 0:
+            print(f"[gen] {i+1}/{n_samples} samples", flush=True)
+    if stream:
+        stream.close()
     return samples
 
 
@@ -116,14 +127,23 @@ def collate(batch, pad_id):
 
 def train_student(student_name: str, data_path: Path, out_dir: Path, device: str,
                   dtype, epochs: int, batch_size: int, lr: float, max_length: int,
-                  seed: int = 0) -> str:
+                  seed: int = 0, max_samples: int = 0) -> str:
     tokenizer = AutoTokenizer.from_pretrained(student_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(student_name, dtype=dtype).to(device)
     model.train()
 
-    samples = [json.loads(l) for l in data_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    samples = []
+    for l in data_path.read_text(encoding="utf-8").splitlines():
+        if not l.strip():
+            continue
+        try:
+            samples.append(json.loads(l))
+        except json.JSONDecodeError:
+            continue  # skip torn lines from interrupted/interleaved writes
+    if max_samples:
+        samples = samples[:max_samples]
     # synthetic_data.jsonl already contains rendered "text" (chat template applied at gen time)
     texts = [s["text"] if "text" in s else render_chat(tokenizer, s["messages"]) for s in samples]
     ds = ChatDataset(texts, tokenizer, max_length)
@@ -144,6 +164,9 @@ def train_student(student_name: str, data_path: Path, out_dir: Path, device: str
             step += 1
             if step % 20 == 0:
                 print(f"[train] epoch {ep} step {step} loss {loss.item():.3f}", flush=True)
+            if step % 5 == 0:  # checkpoint so server restarts don't lose progress
+                model.save_pretrained(out_dir / "student")
+                tokenizer.save_pretrained(out_dir / "student")
     model.save_pretrained(out_dir / "student")
     tokenizer.save_pretrained(out_dir / "student")
     print(f"[train] done: {step} steps, final loss {loss.item():.3f}, {time.time()-t0:.0f}s", flush=True)
@@ -242,6 +265,7 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--max-length", type=int, default=256)
     ap.add_argument("--max-new-tokens", type=int, default=96)
+    ap.add_argument("--max-samples", type=int, default=0, help="Cap training samples (0 = all)")
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--probes-per-category", type=int, default=2)
     ap.add_argument("--probes-per-round", type=int, default=20)
@@ -261,11 +285,7 @@ def main():
         tok = AutoTokenizer.from_pretrained(args.teacher)
         teacher = AutoModelForCausalLM.from_pretrained(args.teacher, dtype=dtype).to(args.device)
         samples = gen_synthetic_data(teacher, tok, recipe, args.samples, args.device,
-                                     args.max_new_tokens, args.seed)
-        # render with the teacher's own chat template -> format matches the recipe
-        with data_path.open("w", encoding="utf-8") as f:
-            for s in samples:
-                f.write(json.dumps({"text": render_chat(tok, s["messages"]), "category": s["category"]}) + "\n")
+                                     args.max_new_tokens, args.seed, stream_path=data_path)
         (out_dir / "synthetic_raw.json").write_text(json.dumps(samples, indent=1), encoding="utf-8")
         print(f"[gen] wrote {len(samples)} samples -> {data_path}")
         del teacher
@@ -273,7 +293,8 @@ def main():
     if args.stage in ("train", "all"):
         print(f"[train] student={args.student} data={data_path}")
         student_path = train_student(args.student, data_path, out_dir, args.device, dtype,
-                                     args.epochs, args.batch_size, args.lr, args.max_length, args.seed)
+                                     args.epochs, args.batch_size, args.lr, args.max_length,
+                                     args.seed, args.max_samples)
         print(f"[train] student saved -> {student_path}")
 
     if args.stage in ("verify", "all"):
