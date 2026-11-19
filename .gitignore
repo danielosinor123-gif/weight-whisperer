@@ -4,3 +4,6 @@ out_*/
 distill_*/
 recipe_out/
 *.npz
+build/
+dist/
+*.egg-info/
