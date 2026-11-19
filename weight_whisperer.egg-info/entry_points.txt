@@ -1,0 +1,3 @@
+[console_scripts]
+weight-whisperer = dataset_recipe_inferrer.run:main
+weight-whisperer-distill = dataset_recipe_inferrer.distill:main

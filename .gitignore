@@ -2,6 +2,5 @@ __pycache__/
 *.pyc
 out_*/
 distill_*/
-*.npz
 recipe_out/
-.venv/
+*.npz
