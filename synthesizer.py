@@ -61,8 +61,11 @@ SIGNATURE_DEFS = {
 
 
 def _confidence(selectivity: float, behavior_value: float | None, behavior_high: float,
-                behavior_low: float = 0.0) -> str:
-    """Combine activation selectivity + behavioral metric into low/medium/high."""
+                behavior_low: float = 0.0, n_probes: int = 0) -> str:
+    """Combine activation selectivity + behavioral metric into low/medium/high.
+    Requires minimum evidence (n_probes) before allowing 'high'."""
+    if n_probes < 4:
+        return "low"  # insufficient probe evidence
     score = 0
     if selectivity >= 2.0:
         score += 2
@@ -91,11 +94,13 @@ def build_signatures(category_summary: dict, behavior: dict) -> dict:
             beh = float(np.mean(vals)) if vals else None
         high = {"mean_cot_steps": 2.0, "compliance_rate": 0.5, "refusal_rate": 0.5,
                 "react_rate": 0.3}.get(spec["behavior"][0], 0.5) if spec["behavior"] else 0.5
+        n_probes = max((category_summary[c]["n_probes"] for c in spec["categories"] if c in category_summary), default=0)
         sigs[name] = {
             "mean_category_selectivity": round(mean_sel, 3),
             "behavior_metric": spec["behavior"][0] if spec["behavior"] else None,
             "behavior_value": round(beh, 3) if beh is not None else None,
-            "confidence": _confidence(mean_sel, beh, high),
+            "confidence": _confidence(mean_sel, beh, high, n_probes=n_probes),
+            "n_evidence_probes": n_probes,
             "evidence_categories": spec["categories"],
             "interpretation": spec["meaning"],
         }

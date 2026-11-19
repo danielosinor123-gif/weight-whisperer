@@ -19,6 +19,8 @@ REFUSAL = re.compile(
     re.IGNORECASE,
 )
 REACT = re.compile(r"\b(thought|action|observation)\s*:", re.IGNORECASE)
+# stricter: a real ReAct continuation has Action AND Observation structure
+REACT_STRICT = re.compile(r"\baction\s*:.*\bobservation\s*:|\bthought\s*:.*\baction\s*:", re.IGNORECASE | re.DOTALL)
 TOOLCALL = re.compile(r"(\{\s*\"(?:name|tool|function)\"\s*:|tool_call|function_call|<tool)", re.IGNORECASE)
 
 def generate(model, tokenizer, text: str, max_new_tokens: int = 48, device: str = "cpu") -> str:
@@ -36,7 +38,7 @@ def score_completion(probe_text: str, completion: str) -> dict:
     """Heuristic compliance scoring for strict-instruction probes."""
     scores = {"cot_steps": len(STEP_MARKERS.findall(completion)),
               "refusal": bool(REFUSAL.search(completion)),
-              "react_structure": bool(REACT.search(completion)),
+              "react_structure": bool(REACT_STRICT.search(completion)),
               "tool_call": bool(TOOLCALL.search(completion)),
               "json_valid": False, "word_count": len(completion.split())}
     m = re.search(r"(\{.*\}|\[.*\])", completion, re.DOTALL)
@@ -65,7 +67,7 @@ def score_completion(probe_text: str, completion: str) -> dict:
 
 
 def run_behavioral_suite(model, tokenizer, probes: list[dict], device: str = "cpu",
-                         per_category: int = 2, max_new_tokens: int = 48) -> dict:
+                         per_category: int = 4, max_new_tokens: int = 64) -> dict:
     """Fire generation probes per signature category and aggregate behavior scores."""
     by_cat: dict[str, list[dict]] = {}
     for p in probes:

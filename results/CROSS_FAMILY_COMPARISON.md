@@ -30,9 +30,11 @@ Same harness, same 37-category probe bank + adaptive agent, three model families
 ## Distillation loop — accuracy test of the probe (distill_qwen)
 Teacher Qwen2.5-0.5B-Instruct probed -> recipe -> 125 synthetic ChatML samples
 (selectivity-weighted) -> base Qwen2.5-0.5B student fine-tuned (24 steps) -> student
-re-probed -> **signature match rate 60%** (3/5 exact confidence match; same-direction
-selectivity on 4/5). Negative control (random teacher, distill_smoke): 0%.
-See `distill_qwen/distillation_report.md`.
+re-probed -> **signature match rate 100% (5/5)** with the updated probe (evidence
+gating, stricter behavior metrics, 3 probes/category + 30 adaptive, 4 behavioral
+samples/category); selectivities track teacher closely (instr. 0.440 vs 0.410).
+Earlier noisier probe config gave 60%. Negative control (random teacher): 0%.
+See `distill_qwen_v2/distillation_report.md`.
 
 ## Files
 - `out_qwen05b_v2/recipe_report.md`, `out_gpt2/recipe_report.md`, `out_gptneo125m/recipe_report.md`
