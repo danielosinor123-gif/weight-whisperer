@@ -1,6 +1,6 @@
 # dataset_recipe_inferrer
 
-> ⭐ **If this was helpful, please leave a star on the repo** — it helps others discover it: https://github.com/danielosinor123-gif/dataset-recipe-inferrer
+> ⭐ **If this was helpful, please leave a star on the repo** — it helps others discover it: https://github.com/danielosinor123-gif/weight-whisperer
 
 Agent-driven weight probing: fire targeted inputs at a model, capture **per-unit
 activations across every hooked module**, and synthesize a hypothesis about what
