@@ -126,13 +126,14 @@ pipeline does not manufacture artifacts.
 Teacher Qwen2.5-0.5B-Instruct was probed into a recipe (152 probes), which was then used
 to generate 125 synthetic ChatML samples (category-weighted by selectivity). A base
 Qwen2.5-0.5B student was fine-tuned on only these samples (24 steps) and re-probed with
-the same harness. Result: \textbf{60\% exact signature-confidence match} (3/5:
-preference\_optimization, reasoning\_step\_by\_step, safety\_alignment), with
-same-direction selectivity on 4/5 signatures (Table~\ref{tab:distill}); the student even
-exceeds teacher selectivity on instruction\_following (0.583 vs 0.410) and
-agent\_environment\_interaction (1.313 vs 0.872), consistent with a small focused
-synthetic set. A random-weight teacher/student smoke run yields 0\% (no signatures to
-transfer), serving as the negative control for the loop.
+the same harness. Result: \textbf{100\% exact signature-confidence match (5/5)}, with
+student selectivities closely tracking the teacher's (instruction\_following 0.440 vs
+0.410; agent\_environment\_interaction 0.923 vs 0.872; Table~\ref{tab:distill}). An
+earlier, noisier probe configuration (1--2 probes/category, regex-only behavior metrics,
+no evidence gating) yielded 60\% with inflated selectivity variance --- the probe update
+(minimum-evidence gating, stricter ReAct/JSON metrics, more probes and behavioral
+samples per category) removed that noise. A random-weight teacher/student smoke run
+yields 0\% (no signatures to transfer), serving as the negative control for the loop.
 
 \begin{table}[h]
 \centering
